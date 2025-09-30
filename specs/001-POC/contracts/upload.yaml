@@ -1,0 +1,133 @@
+openapi: 3.0.0
+info:
+  title: SawtFeel File Upload API
+  description: API for uploading and processing audio/video files
+  version: 1.0.0
+
+paths:
+  /api/upload:
+    post:
+      summary: Upload audio/video file
+      description: Upload a file for emotion analysis processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio or video file (MP3, WAV, MP4, AVI, MOV, MKV, WebM, FLV)
+              required:
+                - file
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                    description: Unique identifier for the uploaded file
+                  status:
+                    type: string
+                    enum: [uploaded, extracting, transcribing, analyzing, completed, failed]
+                    description: Current processing status
+                  message:
+                    type: string
+                    description: Status message
+        '400':
+          description: Bad request - invalid file
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+                  details:
+                    type: string
+                    description: Additional error details
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: File size exceeds limit
+                  max_size:
+                    type: integer
+                    description: Maximum allowed file size in bytes
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Unsupported file format
+                  supported_formats:
+                    type: array
+                    items:
+                      type: string
+                    description: List of supported formats
+
+  /api/upload/{file_id}/status:
+    get:
+      summary: Get processing status
+      description: Get the current processing status of an uploaded file
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '200':
+          description: Processing status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [uploaded, extracting, transcribing, analyzing, completed, failed]
+                  progress:
+                    type: number
+                    minimum: 0
+                    maximum: 100
+                    description: Processing progress percentage
+                  message:
+                    type: string
+                    description: Current status message
+                  estimated_completion:
+                    type: string
+                    format: date-time
+                    description: Estimated completion time
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: File not found

@@ -1,0 +1,221 @@
+openapi: 3.0.0
+info:
+  title: SawtFeel Processing API
+  description: API for retrieving processing results and analysis data
+  version: 1.0.0
+
+paths:
+  /api/processing/{file_id}/transcript:
+    get:
+      summary: Get transcript
+      description: Retrieve the transcribed text with word-level timestamps
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '200':
+          description: Transcript retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                  text:
+                    type: string
+                    description: Full Arabic transcript
+                  words:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        word:
+                          type: string
+                          description: Arabic word
+                        start_time:
+                          type: number
+                          description: Start time in seconds
+                        end_time:
+                          type: number
+                          description: End time in seconds
+                        confidence:
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                          description: Word-level confidence
+                  language:
+                    type: string
+                    description: Detected language
+                  overall_confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+                    description: Overall transcription confidence
+        '404':
+          description: File or transcript not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: File or transcript not found
+        '409':
+          description: Processing not complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Transcript not yet available
+                  status:
+                    type: string
+                    description: Current processing status
+
+  /api/processing/{file_id}/emotions:
+    get:
+      summary: Get emotion analysis
+      description: Retrieve emotion analysis data with timestamps
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '200':
+          description: Emotion analysis retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                  overall_emotion:
+                    type: string
+                    enum: [anger, sadness, joy, neutral, fear, surprise]
+                    description: Primary emotion for entire file
+                  overall_confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+                    description: Overall confidence
+                  segments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start_time:
+                          type: number
+                          description: Start time in seconds
+                        end_time:
+                          type: number
+                          description: End time in seconds
+                        textual_emotion:
+                          type: string
+                          enum: [anger, sadness, joy, neutral, fear, surprise]
+                          description: Emotion from text analysis
+                        textual_confidence:
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                          description: Text emotion confidence
+                        tonal_emotion:
+                          type: string
+                          enum: [anger, sadness, joy, neutral, fear, surprise]
+                          description: Emotion from audio tone
+                        tonal_confidence:
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                          description: Tone emotion confidence
+                        combined_emotion:
+                          type: string
+                          enum: [anger, sadness, joy, neutral, fear, surprise]
+                          description: Final combined emotion
+                        combined_confidence:
+                          type: number
+                          minimum: 0
+                          maximum: 1
+                          description: Combined confidence
+        '404':
+          description: File or analysis not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: File or analysis not found
+        '409':
+          description: Processing not complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Analysis not yet available
+                  status:
+                    type: string
+                    description: Current processing status
+
+  /api/processing/{file_id}/audio-url:
+    get:
+      summary: Get audio URL
+      description: Get the URL for streaming the processed audio file
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '200':
+          description: Audio URL retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id:
+                    type: string
+                    format: uuid
+                  audio_url:
+                    type: string
+                    format: uri
+                    description: URL for streaming audio
+                  duration:
+                    type: number
+                    description: Audio duration in seconds
+                  format:
+                    type: string
+                    description: Audio format
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: File not found

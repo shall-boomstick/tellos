@@ -1,0 +1,166 @@
+openapi: 3.0.0
+info:
+  title: SawtFeel WebSocket API
+  description: WebSocket API for real-time communication during processing and playback
+  version: 1.0.0
+
+paths:
+  /ws/processing/{file_id}:
+    get:
+      summary: WebSocket connection for processing updates
+      description: Real-time updates during file processing
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '101':
+          description: WebSocket connection established
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [connected, status_update, progress_update, completed, error]
+                    description: Message type
+                  data:
+                    type: object
+                    description: Message payload
+
+  /ws/playback/{file_id}:
+    get:
+      summary: WebSocket connection for playback synchronization
+      description: Real-time synchronization during audio playback
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: File identifier
+      responses:
+        '101':
+          description: WebSocket connection established
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [connected, time_update, emotion_update, transcript_update, disconnected]
+                    description: Message type
+                  data:
+                    type: object
+                    description: Message payload
+
+components:
+  schemas:
+    ProcessingStatusMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [status_update, progress_update, completed, error]
+        file_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [uploaded, extracting, transcribing, analyzing, completed, failed]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    PlaybackTimeMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [time_update]
+        file_id:
+          type: string
+          format: uuid
+        current_time:
+          type: number
+          description: Current playback time in seconds
+        is_playing:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    EmotionUpdateMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [emotion_update]
+        file_id:
+          type: string
+          format: uuid
+        current_time:
+          type: number
+          description: Current playback time in seconds
+        emotion:
+          type: string
+          enum: [anger, sadness, joy, neutral, fear, surprise]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        timestamp:
+          type: string
+          format: date-time
+
+    TranscriptUpdateMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [transcript_update]
+        file_id:
+          type: string
+          format: uuid
+        current_time:
+          type: number
+          description: Current playback time in seconds
+        current_word:
+          type: string
+          description: Currently highlighted word
+        word_index:
+          type: integer
+          description: Index of current word in transcript
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [error]
+        file_id:
+          type: string
+          format: uuid
+        error_code:
+          type: string
+        error_message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

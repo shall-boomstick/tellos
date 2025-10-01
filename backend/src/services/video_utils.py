@@ -101,11 +101,17 @@ def extract_audio_from_video(video_path: str, output_path: str) -> str:
         Path to extracted audio file
     """
     try:
-        # Use ffmpeg to extract audio
+        # Use ffmpeg to extract audio optimized for Arabic speech recognition
         (
             ffmpeg
             .input(video_path)
-            .output(output_path, acodec='pcm_s16le', ac=1, ar=16000)
+            .output(
+                output_path, 
+                acodec='pcm_s16le',  # 16-bit PCM
+                ac=1,                # Mono for speech recognition
+                ar=16000,            # Standard sample rate for Whisper
+                af='highpass=f=200,lowpass=f=3400,volume=1.5'  # Simple and reliable audio processing for speech
+            )
             .overwrite_output()
             .run(capture_stdout=True, capture_stderr=True)
         )

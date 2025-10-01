@@ -3,7 +3,7 @@ import './styles/light.css'
 import './styles/dark.css'
 import './styles/mobile.css'
 import FileUpload from './components/FileUpload'
-import Dashboard from './pages/Dashboard'
+import RealtimeInterface from './pages/RealtimeInterface'
 import ThemeToggle from './components/ThemeToggle'
 import themeService, { subscribeToTheme } from './services/theme'
 import { uploadAPI } from './services/api'
@@ -73,43 +73,13 @@ function App() {
       </header>
       
       <main className="app-main">
-        {currentFile ? (
-          <Dashboard 
-            fileData={currentFile} 
-            onNewUpload={handleNewUpload}
-          />
-        ) : (
-          <div className="upload-page">
-            <div className="welcome-section">
-              <h2>Welcome to SawtFeel</h2>
-              <p>Upload your Arabic audio or video file to analyze emotions in real-time.</p>
-            </div>
-            
-            <FileUpload
-              onFileSelect={handleFileSelect}
-              isUploading={isUploading}
-              error={error}
-            />
-            
-            <div className="features-section">
-              <div className="feature">
-                <div className="feature-icon">🎭</div>
-                <h3>Emotion Analysis</h3>
-                <p>Dual-path analysis combining text sentiment and vocal tone</p>
-              </div>
-              <div className="feature">
-                <div className="feature-icon">📝</div>
-                <h3>Arabic Transcription</h3>
-                <p>Accurate speech-to-text with word-level timestamps</p>
-              </div>
-              <div className="feature">
-                <div className="feature-icon">⚡</div>
-                <h3>Real-time Processing</h3>
-                <p>Live updates and synchronized playback visualization</p>
-              </div>
-            </div>
-          </div>
-        )}
+        <RealtimeInterface 
+          fileData={currentFile} 
+          onNewUpload={handleNewUpload}
+          onFileSelect={handleFileSelect}
+          isUploading={isUploading}
+          error={error}
+        />
       </main>
       
       <footer className="app-footer">

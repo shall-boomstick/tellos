@@ -10,8 +10,10 @@ from datetime import datetime
 import uuid
 
 from .audio_processor import audio_processor
-from .transcription_service import transcription_service, translation_service
-from .translation_service import TranslationService
+from .transcription_service import transcription_service
+from .gemini_transcription_service import get_gemini_service
+import os
+from .translation_service import TranslationService, translation_service
 from .emotion_analyzer import emotion_analyzer
 from .file_manager import file_manager
 from .redis_client import redis_client
@@ -145,13 +147,33 @@ class ProcessingPipeline:
                 # Force re-processing by not returning cached data
                 # return Transcript(**cached_transcript)
             
-            # Perform transcription
-            logger.info(f"Starting transcription for file {audio_file.id} with audio path: {audio_path}")
-            transcript = await transcription_service.transcribe_audio(
-                audio_path, 
-                audio_file.id, 
-                language="ar"
-            )
+            # Perform transcription using configured service
+            transcription_service_type = os.getenv("TRANSCRIPTION_SERVICE", "whisper").lower()
+            logger.info(f"Starting transcription for file {audio_file.id} using {transcription_service_type} service")
+            
+            if transcription_service_type == "gemini":
+                try:
+                    gemini_service = get_gemini_service()
+                    transcript = await gemini_service.transcribe_audio(
+                        audio_path, 
+                        audio_file.id, 
+                        language="ar"
+                    )
+                    logger.info(f"Gemini transcription successful: {len(transcript.text)} characters")
+                except Exception as e:
+                    logger.warning(f"Gemini transcription failed, falling back to Whisper: {e}")
+                    transcript = await transcription_service.transcribe_audio(
+                        audio_path, 
+                        audio_file.id, 
+                        language="ar"
+                    )
+            else:
+                # Use Whisper as default/fallback
+                transcript = await transcription_service.transcribe_audio(
+                    audio_path, 
+                    audio_file.id, 
+                    language="ar"
+                )
             logger.info(f"Transcription completed for file {audio_file.id}: {len(transcript.text)} characters")
             
             # Translate Arabic text to English

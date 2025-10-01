@@ -16,8 +16,11 @@ isort==5.12.0
 # Video processing libraries
 opencv-python==4.8.1.78
 ffmpeg-python==0.2.0
-librosa==0.10.1
 moviepy==1.0.3
+# Real-time audio processing
+librosa==0.10.1
+soundfile==0.12.1
+# WebSocket support (built into FastAPI)
 # AI/ML libraries
 openai-whisper==20231117
 transformers==4.35.2
@@ -26,3 +29,6 @@ torchaudio==2.1.1
 numpy==1.24.4
 scipy==1.11.4
 psutil==5.9.6
+# Google Gemini API
+google-generativeai==0.8.3
+google-cloud-aiplatform==1.38.1

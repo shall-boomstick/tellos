@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Playback Test</title>
+</head>
+<body>
+    <h1>Video Playback Test</h1>
+    
+    <h2>Test Video 1 (Latest Upload)</h2>
+    <video controls width="400" crossorigin="anonymous">
+        <source src="http://localhost:8000/video/stream/08cbb091-4a2d-4c63-bf7e-863e7a05c74e" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    
+    <h2>Test Video 2 (Previous Upload)</h2>
+    <video controls width="400" crossorigin="anonymous">
+        <source src="http://localhost:8000/video/stream/bfdbde4c-635a-454a-8cba-9a85548a71f6" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    
+    <h2>Browser Support Test</h2>
+    <script>
+        const video = document.createElement('video');
+        
+        console.log('Browser video format support:');
+        console.log('MP4 (basic):', video.canPlayType('video/mp4'));
+        console.log('MP4 H.264 baseline:', video.canPlayType('video/mp4; codecs="avc1.42E01E"'));
+        console.log('MP4 H.264 main:', video.canPlayType('video/mp4; codecs="avc1.4D401E"'));
+        console.log('WebM:', video.canPlayType('video/webm'));
+        
+        document.body.innerHTML += '<p>Check browser console for codec support details</p>';
+        
+        // Add error handlers to videos
+        const videos = document.querySelectorAll('video');
+        videos.forEach((v, index) => {
+            v.addEventListener('error', (e) => {
+                console.error(`Video ${index + 1} error:`, e);
+                console.error('Error code:', v.error?.code);
+                console.error('Error message:', v.error?.message);
+            });
+            
+            v.addEventListener('loadeddata', () => {
+                console.log(`Video ${index + 1} loaded successfully`);
+            });
+        });
+    </script>
+</body>
+</html>

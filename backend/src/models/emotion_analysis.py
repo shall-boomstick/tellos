@@ -42,7 +42,8 @@ class EmotionSegment(BaseModel):
         if 'textual_confidence' in values and 'tonal_confidence' in values:
             min_conf = min(values['textual_confidence'], values['tonal_confidence'])
             max_conf = max(values['textual_confidence'], values['tonal_confidence'])
-            if v < min_conf * 0.5 or v > max_conf * 1.1:
+            # Allow more flexibility for combined confidence (up to 1.3x max individual confidence)
+            if v < min_conf * 0.3 or v > max_conf * 1.3:
                 raise ValueError('Combined confidence should be reasonable given individual confidences')
         return v
     

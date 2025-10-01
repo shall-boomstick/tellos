@@ -25,6 +25,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TRANSCRIPTION_SERVICE=gemini
       
   frontend:
     build:

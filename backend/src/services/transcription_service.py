@@ -61,25 +61,8 @@ class TranscriptionService:
             
             logger.info(f"Transcribing audio: {audio_path} (language: {language})")
             
-            # Transcribe with Whisper
-            result = self.model.transcribe(
-                audio_path,
-                language=language,
-                word_timestamps=True,
-                verbose=False,
-                temperature=0.0,  # Deterministic results
-                best_of=1,
-                beam_size=5,
-                patience=1.0,
-                length_penalty=1.0,
-                suppress_tokens="-1",
-                initial_prompt="",
-                condition_on_previous_text=True,
-                fp16=torch.cuda.is_available(),
-                compression_ratio_threshold=2.4,
-                logprob_threshold=-1.0,
-                no_speech_threshold=0.6
-            )
+            # Try multiple transcription strategies for best results
+            result = await self._transcribe_with_fallback(audio_path, language)
             
             # Process results
             transcript = self._process_transcription_result(result, file_id, language)
@@ -92,6 +75,164 @@ class TranscriptionService:
         except Exception as e:
             logger.error(f"Error transcribing audio {audio_path}: {str(e)}")
             raise
+    
+    async def _transcribe_with_fallback(self, audio_path: str, language: str) -> Dict:
+        """Try multiple transcription strategies to get the best result."""
+        strategies = [
+            # Strategy 1: Conservative approach for clear speech
+            {
+                "temperature": 0.0,
+                "condition_on_previous_text": False,
+                "beam_size": 5,
+                "best_of": 1,
+                "no_speech_threshold": 0.6,
+                "compression_ratio_threshold": 2.4,
+                "logprob_threshold": -1.0,
+                "initial_prompt": "",
+                "name": "conservative"
+            },
+            # Strategy 2: More aggressive for difficult audio
+            {
+                "temperature": 0.2,
+                "condition_on_previous_text": False,
+                "beam_size": 8,
+                "best_of": 3,
+                "no_speech_threshold": 0.4,
+                "compression_ratio_threshold": 3.0,
+                "logprob_threshold": -0.8,
+                "initial_prompt": "",
+                "name": "aggressive"
+            },
+            # Strategy 3: With Arabic context
+            {
+                "temperature": 0.1,
+                "condition_on_previous_text": False,
+                "beam_size": 6,
+                "best_of": 2,
+                "no_speech_threshold": 0.5,
+                "compression_ratio_threshold": 2.8,
+                "logprob_threshold": -0.9,
+                "initial_prompt": "محادثة باللغة العربية",
+                "name": "arabic_context"
+            }
+        ]
+        
+        best_result = None
+        best_score = -1
+        
+        for strategy in strategies:
+            try:
+                logger.info(f"Trying transcription strategy: {strategy['name']}")
+                
+                result = self.model.transcribe(
+                    audio_path,
+                    language=language,
+                    word_timestamps=True,
+                    verbose=False,
+                    temperature=strategy["temperature"],
+                    best_of=strategy["best_of"],
+                    beam_size=strategy["beam_size"],
+                    patience=1.0,
+                    length_penalty=1.0,
+                    suppress_tokens="-1",
+                    initial_prompt=strategy["initial_prompt"],
+                    condition_on_previous_text=strategy["condition_on_previous_text"],
+                    fp16=torch.cuda.is_available(),
+                    compression_ratio_threshold=strategy["compression_ratio_threshold"],
+                    logprob_threshold=strategy["logprob_threshold"],
+                    no_speech_threshold=strategy["no_speech_threshold"]
+                )
+                
+                # Score the result based on quality metrics
+                score = self._score_transcription_result(result)
+                logger.info(f"Strategy '{strategy['name']}' score: {score:.3f}, text length: {len(result.get('text', ''))}")
+                
+                if score > best_score:
+                    best_score = score
+                    best_result = result
+                    logger.info(f"New best result from strategy: {strategy['name']}")
+                
+            except Exception as e:
+                logger.warning(f"Strategy '{strategy['name']}' failed: {e}")
+                continue
+        
+        if best_result is None:
+            raise RuntimeError("All transcription strategies failed")
+        
+        logger.info(f"Selected best transcription with score: {best_score:.3f}")
+        return best_result
+    
+    def _score_transcription_result(self, result: Dict) -> float:
+        """Score a transcription result based on quality metrics."""
+        if not result or 'text' not in result:
+            return 0.0
+        
+        text = result['text'].strip()
+        segments = result.get('segments', [])
+        
+        if not text or not segments:
+            return 0.0
+        
+        # Check for hallucination patterns
+        if self._is_hallucination(text):
+            return 0.1  # Very low score for hallucinations
+        
+        # Score based on multiple factors
+        score = 0.0
+        
+        # 1. Text length (longer is generally better for dialogue)
+        length_score = min(len(text) / 500.0, 1.0)  # Normalize to 500 chars
+        score += length_score * 0.3
+        
+        # 2. Number of segments (more segments = more dialogue)
+        segment_score = min(len(segments) / 10.0, 1.0)  # Normalize to 10 segments
+        score += segment_score * 0.2
+        
+        # 3. Average confidence
+        if segments:
+            avg_confidence = sum(seg.get('avg_logprob', -2.0) for seg in segments) / len(segments)
+            confidence_score = max(0, (avg_confidence + 2.0) / 2.0)  # Normalize from [-2,0] to [0,1]
+            score += confidence_score * 0.3
+        
+        # 4. Vocabulary diversity (unique words)
+        words = text.split()
+        if words:
+            unique_ratio = len(set(words)) / len(words)
+            score += unique_ratio * 0.2
+        
+        return score
+    
+    def _is_hallucination(self, text: str) -> bool:
+        """Detect if text contains hallucination patterns."""
+        if not text:
+            return True
+        
+        words = text.split()
+        if len(words) < 3:
+            return True
+        
+        # Check for excessive repetition
+        word_counts = {}
+        for word in words:
+            word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # If any word appears more than 40% of the time, it's likely hallucination
+        max_count = max(word_counts.values())
+        if max_count / len(words) > 0.4:
+            return True
+        
+        # Check for specific hallucination patterns
+        hallucination_patterns = [
+            "ورحمة الله ورحمة الله",
+            "السلام عليكم السلام عليكم",
+            "بسم الله بسم الله"
+        ]
+        
+        for pattern in hallucination_patterns:
+            if pattern in text:
+                return True
+        
+        return False
     
     def _process_transcription_result(self, result: Dict, file_id: str, language: str) -> Transcript:
         """
@@ -363,7 +504,7 @@ class TranscriptionService:
             logger.info("Cleaned up transcription model resources")
 
 # Global transcription service instance
-transcription_service = TranscriptionService()
+transcription_service = TranscriptionService(model_size="medium")
 
 # Import and create translation service instance
 from .translation_service import TranslationService

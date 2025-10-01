@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import hashlib
 import logging
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
@@ -91,6 +92,24 @@ class FileManager:
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_content)
             
+            # Ensure file is fully written and accessible
+            await asyncio.sleep(0.1)  # Small delay to ensure file system sync
+            
+            # Verify file was written correctly
+            if not os.path.exists(file_path) or os.path.getsize(file_path) != len(file_content):
+                raise RuntimeError(f"File was not written correctly: {file_path}")
+            
+            # Optimize video files for web streaming
+            if self._is_video_file(filename):
+                logger.info(f"Starting video optimization for: {file_path}")
+                optimized_path = await self._optimize_video_for_web(str(file_path))
+                if optimized_path:
+                    # Replace original with optimized version
+                    os.replace(optimized_path, str(file_path))
+                    logger.info(f"Optimized video for web streaming: {file_path}")
+                else:
+                    logger.warning(f"Video optimization failed, keeping original: {file_path}")
+            
             # Calculate file hash for integrity
             file_hash = self._calculate_file_hash(file_content)
             
@@ -127,6 +146,126 @@ class FileManager:
                 self._save_metadata()
         
         return None
+    
+    def _is_video_file(self, filename: str) -> bool:
+        """Check if file is a video file."""
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv'}
+        return Path(filename).suffix.lower() in video_extensions
+    
+    async def _optimize_video_for_web(self, video_path: str) -> Optional[str]:
+        """Optimize video file for web streaming."""
+        try:
+            # Check if input file exists and is readable
+            if not os.path.exists(video_path):
+                logger.error(f"Input video file does not exist: {video_path}")
+                return None
+            
+            # Create temporary output file with absolute path
+            abs_video_path = os.path.abspath(video_path)
+            temp_output = f"{abs_video_path}.optimized"
+            
+            # Ensure the directory exists and is writable
+            output_dir = os.path.dirname(temp_output)
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+            
+            logger.info(f"Video optimization paths - Input: {abs_video_path}, Output: {temp_output}")
+            
+            # Check if the video is already web-compatible
+            try:
+                probe_result = await asyncio.create_subprocess_exec(
+                    'ffprobe', '-v', 'quiet', '-print_format', 'json', 
+                    '-show_format', '-show_streams', abs_video_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await probe_result.communicate()
+                
+                if probe_result.returncode == 0:
+                    import json
+                    probe_data = json.loads(stdout.decode())
+                    video_stream = next((s for s in probe_data.get('streams', []) if s.get('codec_type') == 'video'), None)
+                    
+                    if video_stream:
+                        codec = video_stream.get('codec_name', '').lower()
+                        profile = video_stream.get('profile', '').lower()
+                        pix_fmt = video_stream.get('pix_fmt', '').lower()
+                        
+                        # Check if already web-compatible
+                        if (codec == 'h264' and 
+                            ('baseline' in profile or 'constrained baseline' in profile) and 
+                            pix_fmt == 'yuv420p'):
+                            logger.info(f"Video is already web-compatible, skipping optimization: {video_path}")
+                            return None  # No optimization needed
+                            
+            except Exception as e:
+                logger.warning(f"Could not probe video for compatibility check: {e}")
+            
+            # Simplified FFmpeg command for better reliability
+            cmd = [
+                'ffmpeg', '-i', abs_video_path,
+                '-c:v', 'libx264',  # H.264 codec
+                '-profile:v', 'baseline',  # Baseline profile for maximum compatibility
+                '-level', '3.0',  # Level 3.0 for better compatibility
+                '-pix_fmt', 'yuv420p',  # Pixel format for compatibility
+                '-movflags', 'faststart',  # Move moov atom to beginning (no +)
+                '-c:a', 'aac',  # AAC audio codec
+                '-b:a', '128k',  # Audio bitrate
+                '-preset', 'ultrafast',  # Fastest encoding
+                '-crf', '28',  # Reasonable quality for web
+                '-maxrate', '1500k',  # Conservative bitrate
+                '-bufsize', '3000k',  # Buffer size
+                '-y',  # Overwrite output file
+                temp_output
+            ]
+            
+            logger.info(f"Starting video optimization: {' '.join(cmd)}")
+            
+            # Run FFmpeg command with timeout
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)  # 5 minute timeout
+            except asyncio.TimeoutError:
+                process.kill()
+                logger.error(f"Video optimization timed out for {video_path}")
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+                return None
+            
+            if process.returncode == 0 and os.path.exists(temp_output):
+                # Verify the output file is valid
+                if os.path.getsize(temp_output) > 0:
+                    logger.info(f"Video optimized successfully: {video_path} -> {temp_output}")
+                    return temp_output
+                else:
+                    logger.error(f"Optimized video file is empty: {temp_output}")
+                    os.remove(temp_output)
+                    return None
+            else:
+                error_msg = stderr.decode() if stderr else "Unknown error"
+                logger.error(f"Video optimization failed for {video_path}: {error_msg}")
+                logger.error(f"FFmpeg return code: {process.returncode}")
+                # Clean up failed optimization file
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error optimizing video {video_path}: {e}")
+            # Clean up on exception
+            abs_video_path = os.path.abspath(video_path)
+            temp_output = f"{abs_video_path}.optimized"
+            if os.path.exists(temp_output):
+                try:
+                    os.remove(temp_output)
+                except:
+                    pass
+            return None
     
     def get_file_info(self, file_id: str) -> Optional[Dict]:
         """Get file information for a given file ID."""

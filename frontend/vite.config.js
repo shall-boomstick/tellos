@@ -9,6 +9,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': 'http://backend:8000',
+      '/video': 'http://backend:8000',
       '/ws': {
         target: 'ws://backend:8000',
         ws: true,

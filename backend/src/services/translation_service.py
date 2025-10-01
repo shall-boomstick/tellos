@@ -163,3 +163,7 @@ class TranslationService:
         except Exception as e:
             logger.error(f"Error translating words: {str(e)}")
             return words  # Return original words if translation fails
+
+
+# Global translation service instance
+translation_service = TranslationService()

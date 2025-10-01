@@ -30,7 +30,7 @@ class AudioProcessor:
         """
         self.temp_dir = temp_dir or tempfile.gettempdir()
         self.supported_sample_rates = [16000, 22050, 44100, 48000]
-        self.target_sample_rate = 16000  # Optimal for speech recognition
+        self.target_sample_rate = 16000  # Standard for speech recognition
         
     async def process_file(self, file_path: str, file_id: str) -> Dict:
         """

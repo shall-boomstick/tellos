@@ -12,7 +12,9 @@ import uvicorn
 from .api.upload import router as upload_router
 from .api.processing import router as processing_router
 from .api.websocket import router as websocket_router
+from .api.realtime_websocket import router as realtime_websocket_router
 from .api.health import router as health_router
+from .api.video_streaming import router as video_router
 
 app = FastAPI(
     title="SawtFeel API",
@@ -38,7 +40,9 @@ async def health_check():
 app.include_router(upload_router, prefix="/api")
 app.include_router(processing_router, prefix="/api")
 app.include_router(websocket_router)  # WebSocket routes don't need /api prefix
+app.include_router(realtime_websocket_router)  # Real-time WebSocket routes
 app.include_router(health_router, prefix="/api")
+app.include_router(video_router)  # Video streaming routes
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

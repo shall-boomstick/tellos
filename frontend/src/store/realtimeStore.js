@@ -30,6 +30,7 @@ const useRealtimeStore = create(
     emotionData: [],
     currentTranscript: null,
     currentEmotion: null,
+    currentEmotionIntensity: 0,
 
     // UI state
     error: null,
@@ -77,6 +78,10 @@ const useRealtimeStore = create(
 
     setCurrentEmotion: (emotion) => {
       set({ currentEmotion: emotion });
+    },
+
+    updateEmotionIntensity: (intensity) => {
+      set({ currentEmotionIntensity: intensity });
     },
 
     setError: (error) => {
@@ -275,7 +280,8 @@ export const useTranscriptData = () => useRealtimeStore(state => ({
 
 export const useEmotionData = () => useRealtimeStore(state => ({
   emotionData: state.emotionData,
-  currentEmotion: state.currentEmotion
+  currentEmotion: state.currentEmotion,
+  currentEmotionIntensity: state.currentEmotionIntensity
 }));
 
 export const useUIState = () => useRealtimeStore(state => ({

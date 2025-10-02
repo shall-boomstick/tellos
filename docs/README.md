@@ -91,6 +91,226 @@ frontend/
 - **RealtimeProcessor**: Main processing orchestrator
 - **CacheService**: Multi-layer caching system
 
+## Processing Pipeline: From Upload to Analysis
+
+### Overview
+
+Our system processes Arabic audio/video files through a sophisticated pipeline that combines speech recognition, translation, and dual-path emotion analysis. Here's the complete journey from upload to final analysis:
+
+### 1. File Upload & Validation
+
+**Input Requirements:**
+- **Supported Formats**: MP4, AVI, MOV, MKV, WebM, FLV (video) and MP3, WAV (audio)
+- **Maximum Duration**: 2 minutes
+- **Maximum Size**: 100MB
+- **Language**: Arabic audio content
+
+**Processing Steps:**
+1. File validation and format verification
+2. Temporary storage in `/tmp/uploads/`
+3. Audio extraction from video files using FFmpeg
+4. Audio preprocessing (normalization, resampling to 16kHz)
+
+### 2. Speech Recognition & Transcription
+
+**Model Used:**
+- **Whisper Model**: `openai/whisper-medium` (configurable via `TRANSCRIPTION_SERVICE` env var)
+- **Fallback Option**: Google Gemini Flash 2.5 (when `TRANSCRIPTION_SERVICE=gemini`)
+- **Language**: Optimized for Arabic speech recognition
+- **Segmentation**: 2-second overlapping segments for real-time processing
+
+**Process:**
+1. Audio chunking into 2-second segments with 0.5-second overlap
+2. Transcription using configured service (Whisper or Gemini)
+3. Confidence scoring for each transcription
+4. Temporal alignment with original audio timestamps
+
+**Service Configuration:**
+- **Default**: Whisper Medium model (`openai/whisper-medium`)
+- **Environment Variable**: `TRANSCRIPTION_SERVICE` (default: "whisper")
+- **Gemini Option**: Set `TRANSCRIPTION_SERVICE=gemini` to use Google Gemini Flash 2.5
+- **Fallback**: If Gemini fails, automatically falls back to Whisper
+
+**Output:**
+```json
+{
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 2.0,
+      "arabic_text": "السلام عليكم",
+      "english_text": "Peace be upon you",
+      "confidence": 0.95
+    }
+  ]
+}
+```
+
+### 3. Dual-Path Emotion Analysis
+
+Our emotion analysis uses a sophisticated dual-path approach combining textual and tonal analysis:
+
+#### 3.1 Textual Emotion Analysis
+
+**Primary Model:**
+- **Arabic BERT**: `CAMeL-Lab/bert-base-arabic-camelbert-msa-sentiment`
+- **Specialization**: Modern Standard Arabic (MSA) sentiment analysis
+- **Fallback Model**: `cardiffnlp/twitter-roberta-base-sentiment-latest`
+
+**Process:**
+1. Arabic text preprocessing and normalization
+2. Sentiment classification (POSITIVE/NEGATIVE/NEUTRAL)
+3. Confidence scoring for each prediction
+4. Emotion mapping to standard emotion types
+
+#### 3.2 Tonal Emotion Analysis
+
+**Approach**: Feature-based audio analysis (no heavy neural networks)
+
+**Audio Features Extracted:**
+- **Energy Features**: RMS energy, energy variance
+- **Spectral Features**: Spectral centroid, bandwidth, rolloff
+- **Pitch Features**: Fundamental frequency analysis
+- **Rhythm Features**: Tempo detection, beat tracking
+- **Other Features**: Zero crossing rate, MFCCs
+
+**Libraries Used:**
+- **Librosa**: Advanced audio feature extraction
+- **NumPy**: Numerical computations
+- **Rule-based Classification**: Heuristic emotion mapping
+
+**Process:**
+1. Audio feature extraction for each 2-second segment
+2. Vocal tone analysis (pitch, energy, spectral characteristics)
+3. Intensity pattern analysis
+4. Rule-based emotion classification
+
+#### 3.3 Combined Emotion Analysis
+
+**Integration Method:**
+1. Weighted combination of textual and tonal confidence scores
+2. Temporal smoothing across segments
+3. Confidence-weighted emotion selection
+
+**Emotion Types Detected:**
+- **JOY** (happiness, excitement)
+- **SADNESS** (sorrow, melancholy)  
+- **ANGER** (aggression, frustration)
+- **FEAR** (anxiety, worry)
+- **SURPRISE** (shock, amazement)
+- **NEUTRAL** (calm, balanced)
+
+**Output:**
+```json
+{
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 2.0,
+      "textual_emotion": "neutral",
+      "textual_confidence": 0.75,
+      "tonal_emotion": "joy",
+      "tonal_confidence": 0.6,
+      "combined_emotion": "neutral",
+      "combined_confidence": 0.68
+    }
+  ]
+}
+```
+
+### 4. Real-Time Processing & Streaming
+
+**WebSocket Architecture:**
+- **Real-time Updates**: Live emotion and translation data
+- **Session Management**: Individual user sessions with state tracking
+- **Caching**: Intelligent caching for performance optimization
+
+**Processing Pipeline:**
+1. **Chunk Processing**: 2-second audio chunks with overlap
+2. **Parallel Analysis**: Simultaneous transcription and emotion analysis
+3. **Real-time Streaming**: WebSocket updates to frontend
+4. **State Management**: Session-based processing state tracking
+
+### 5. Caching & Performance Optimization
+
+**Caching Strategy:**
+- **File-level Caching**: Complete results cached per file
+- **Segment-level Caching**: Individual processing results
+- **Model Caching**: Pre-loaded models for faster inference
+- **Redis Storage**: Session and temporary data storage
+
+**Performance Optimizations:**
+- **Lazy Loading**: Models loaded only when needed
+- **Feature-based Audio**: Avoids heavy neural networks for audio
+- **Async Processing**: Non-blocking I/O operations
+- **Memory Management**: Efficient resource utilization
+
+### 6. Assumptions & Limitations
+
+#### Technical Assumptions:
+1. **Audio Quality**: Assumes clear, audible Arabic speech
+2. **Language**: Optimized for Modern Standard Arabic (MSA)
+3. **Duration**: 2-minute limit ensures processing efficiency
+4. **Format**: Standard audio/video formats with good compression
+
+#### Model Assumptions:
+1. **Arabic BERT**: Assumes MSA dialect (may not work well with regional dialects)
+2. **Whisper**: Assumes clear pronunciation and minimal background noise
+3. **Audio Features**: Assumes human speech (not music or environmental sounds)
+4. **Emotion Mapping**: Assumes standard emotion categories apply across cultures
+
+#### Processing Assumptions:
+1. **Real-time**: Assumes 2-second segments provide sufficient context
+2. **Overlap**: Assumes 0.5-second overlap prevents emotion boundary issues
+3. **Combination**: Assumes textual and tonal emotions can be meaningfully combined
+4. **Caching**: Assumes file-level caching is sufficient for performance
+
+### 7. Error Handling & Fallbacks
+
+**Graceful Degradation:**
+1. **Model Failures**: Fallback to simpler models or rule-based analysis
+2. **Processing Errors**: Continue with available data
+3. **Network Issues**: Retry mechanisms and offline processing
+4. **Resource Constraints**: Adaptive quality reduction
+
+**Quality Assurance:**
+- Confidence scoring for all outputs
+- Validation of processing results
+- Error logging and monitoring
+- User feedback mechanisms
+
+### 8. Output Format
+
+**Final Results Structure:**
+```json
+{
+  "file_id": "uuid",
+  "overall_emotion": "neutral",
+  "overall_confidence": 0.89,
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 2.0,
+      "arabic_text": "السلام عليكم",
+      "english_text": "Peace be upon you",
+      "textual_emotion": "neutral",
+      "textual_confidence": 0.75,
+      "tonal_emotion": "joy",
+      "tonal_confidence": 0.6,
+      "combined_emotion": "neutral",
+      "combined_confidence": 0.68
+    }
+  ],
+  "processing_metadata": {
+    "models_used": ["whisper-medium", "camelbert-msa-sentiment"],
+    "processing_time": 45.2,
+    "segments_processed": 15
+  }
+}
+```
+
+This comprehensive pipeline ensures accurate, real-time emotion analysis while maintaining performance and reliability.
+
 ## Installation
 
 ### Prerequisites

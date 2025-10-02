@@ -112,40 +112,43 @@ const RealtimeEmotionGauge = ({
         </div>
       </div>
 
-      {/* Current Emotion Display */}
+      {/* Current Emotion Display - Compact */}
       {displayEmotion ? (
-        <div className="current-emotion mb-4">
-          <Card className="text-center" style={{ backgroundColor: getEmotionColor(displayEmotion.emotion_type) + '20' }}>
-            <Card.Body className="p-3">
-              <div className="emotion-icon mb-2">
-                <i 
-                  className={`fas ${getEmotionIcon(displayEmotion.emotion_type)} fa-3x`}
-                  style={{ color: getEmotionColor(displayEmotion.emotion_type) }}
-                ></i>
+        <div className="current-emotion mb-3">
+          <div className="d-flex align-items-center p-2" style={{ 
+            backgroundColor: getEmotionColor(displayEmotion.emotion_type) + '15',
+            borderRadius: '8px',
+            border: `1px solid ${getEmotionColor(displayEmotion.emotion_type)}40`
+          }}>
+            <div className="emotion-icon me-3">
+              <i 
+                className={`fas ${getEmotionIcon(displayEmotion.emotion_type)} fa-2x`}
+                style={{ color: getEmotionColor(displayEmotion.emotion_type) }}
+              ></i>
+            </div>
+            
+            <div className="flex-grow-1">
+              <div className="d-flex align-items-center mb-1">
+                <h6 className="mb-0 me-2" style={{ color: getEmotionColor(displayEmotion.emotion_type) }}>
+                  {displayEmotion.emotion_type?.toUpperCase() || 'UNKNOWN'}
+                </h6>
+                <Badge bg={getIntensityColor(displayEmotion.intensity)} size="sm">
+                  {getIntensityLevel(displayEmotion.intensity)}
+                </Badge>
               </div>
               
-              <h5 className="emotion-type mb-2" style={{ color: getEmotionColor(displayEmotion.emotion_type) }}>
-                {displayEmotion.emotion_type?.toUpperCase() || 'UNKNOWN'}
-              </h5>
-              
-              <div className="emotion-meta">
-                <div className="mb-2">
-                  <Badge bg={getIntensityColor(displayEmotion.intensity)} className="me-2">
-                    {getIntensityLevel(displayEmotion.intensity)} Intensity
-                  </Badge>
-                  <Badge bg="info">
-                    {formatConfidence(displayEmotion.confidence)} Confidence
-                  </Badge>
-                </div>
-                
+              <div className="d-flex justify-content-between align-items-center">
+                <small className="text-muted">
+                  {formatConfidence(displayEmotion.confidence)} confidence
+                </small>
                 <small className="text-muted">
                   {displayEmotion.timestamp && 
                     new Date(displayEmotion.timestamp * 1000).toLocaleTimeString()
                   }
                 </small>
               </div>
-            </Card.Body>
-          </Card>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="text-center text-muted py-4">
@@ -160,115 +163,69 @@ const RealtimeEmotionGauge = ({
         </div>
       )}
 
-      {/* Intensity Gauge */}
+      {/* Compact Intensity & Confidence */}
       {displayEmotion && (
-        <div className="intensity-gauge mb-4">
-          <h6 className="mb-2">Intensity Level</h6>
+        <div className="compact-meters mb-3">
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <small className="fw-bold">Intensity</small>
+            <small className="text-muted">{Math.round(displayEmotion.intensity * 100)}%</small>
+          </div>
           <ProgressBar
             now={displayEmotion.intensity * 100}
             variant={getIntensityColor(displayEmotion.intensity)}
-            label={`${Math.round(displayEmotion.intensity * 100)}%`}
-            style={{ height: '25px' }}
+            style={{ height: '12px', marginBottom: '8px' }}
           />
-          <div className="d-flex justify-content-between mt-1">
-            <small className="text-muted">Low</small>
-            <small className="text-muted">High</small>
+          
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <small className="fw-bold">Confidence</small>
+            <small className="text-muted">{formatConfidence(displayEmotion.confidence)}</small>
           </div>
-        </div>
-      )}
-
-      {/* Confidence Meter */}
-      {displayEmotion && (
-        <div className="confidence-meter mb-4">
-          <h6 className="mb-2">Confidence</h6>
           <ProgressBar
             now={displayEmotion.confidence * 100}
             variant={displayEmotion.confidence >= 0.8 ? 'success' : displayEmotion.confidence >= 0.6 ? 'warning' : 'danger'}
-            label={formatConfidence(displayEmotion.confidence)}
-            style={{ height: '20px' }}
+            style={{ height: '12px' }}
           />
         </div>
       )}
 
-      {/* Emotion History */}
-      {emotionHistory.length > 0 && (
-        <div className="emotion-history">
-          <h6 className="mb-2">Recent Emotions</h6>
-          <div className="emotion-timeline">
-            {emotionHistory.slice(-10).reverse().map((emotion, index) => (
-              <div 
-                key={index}
-                className="emotion-item d-flex align-items-center mb-2 p-2 rounded"
-                style={{ 
-                  backgroundColor: getEmotionColor(emotion.emotion_type) + '10',
-                  borderLeft: `4px solid ${getEmotionColor(emotion.emotion_type)}`
-                }}
-              >
-                <i 
-                  className={`fas ${getEmotionIcon(emotion.emotion_type)} me-2`}
-                  style={{ color: getEmotionColor(emotion.emotion_type) }}
-                ></i>
-                <div className="flex-grow-1">
-                  <div className="fw-bold" style={{ color: getEmotionColor(emotion.emotion_type) }}>
-                    {emotion.emotion_type?.toUpperCase()}
-                  </div>
-                  <small className="text-muted">
-                    {emotion.timestamp && 
-                      new Date(emotion.timestamp * 1000).toLocaleTimeString()
-                    }
-                  </small>
-                </div>
-                <div className="text-end">
-                  <Badge 
-                    bg={getIntensityColor(emotion.intensity)}
-                    style={{ fontSize: '0.7em' }}
-                  >
-                    {getIntensityLevel(emotion.intensity)}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Statistics */}
+      {/* Compact Statistics */}
       {emotionHistory.length > 0 && (
-        <div className="emotion-stats mt-3">
-          <h6 className="mb-2">Statistics</h6>
-          <div className="row text-center">
-            <div className="col-6">
-              <div className="stat-item">
-                <div className="fw-bold text-primary">{emotionHistory.length}</div>
-                <small className="text-muted">Total Emotions</small>
-              </div>
+        <div className="emotion-stats mb-3">
+          <div className="d-flex justify-content-between align-items-center p-2" style={{ 
+            backgroundColor: '#f8f9fa',
+            borderRadius: '6px',
+            border: '1px solid #e9ecef'
+          }}>
+            <div className="text-center">
+              <div className="fw-bold text-primary fs-6">{emotionHistory.length}</div>
+              <small className="text-muted">Emotions</small>
             </div>
-            <div className="col-6">
-              <div className="stat-item">
-                <div className="fw-bold text-success">
-                  {emotionHistory.length > 0 ? 
-                    Math.round(emotionHistory.reduce((sum, e) => sum + (e.confidence || 0), 0) / emotionHistory.length * 100) 
-                    : 0}%
-                </div>
-                <small className="text-muted">Avg Confidence</small>
+            <div className="text-center">
+              <div className="fw-bold text-success fs-6">
+                {emotionHistory.length > 0 ? 
+                  Math.round(emotionHistory.reduce((sum, e) => sum + (e.confidence || 0), 0) / emotionHistory.length * 100) 
+                  : 0}%
               </div>
+              <small className="text-muted">Avg Confidence</small>
             </div>
           </div>
         </div>
       )}
 
-      {/* Controls */}
-      <div className="emotion-controls mt-3 d-flex justify-content-between">
+      {/* Compact Controls */}
+      <div className="emotion-controls d-flex gap-2">
         <button
-          className="btn btn-sm btn-outline-secondary"
+          className="btn btn-sm btn-outline-secondary flex-fill"
           onClick={() => setEmotionHistory([])}
           disabled={emotionHistory.length === 0}
+          title="Clear History"
         >
-          <i className="fas fa-trash"></i> Clear History
+          <i className="fas fa-trash"></i>
         </button>
         
         <button
-          className="btn btn-sm btn-outline-info"
+          className="btn btn-sm btn-outline-info flex-fill"
           onClick={() => {
             // Export emotion data
             const dataStr = JSON.stringify(emotionHistory, null, 2);
@@ -281,8 +238,9 @@ const RealtimeEmotionGauge = ({
             URL.revokeObjectURL(url);
           }}
           disabled={emotionHistory.length === 0}
+          title="Export Data"
         >
-          <i className="fas fa-download"></i> Export
+          <i className="fas fa-download"></i>
         </button>
       </div>
     </div>

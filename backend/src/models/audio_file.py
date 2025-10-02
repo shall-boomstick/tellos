@@ -17,10 +17,18 @@ class ProcessingStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+
 class FileType(str, Enum):
     """File type enumeration."""
     AUDIO = "audio"
     VIDEO = "video"
+
+
+class TranscriptionService(str, Enum):
+    """Transcription service enumeration."""
+    WHISPER = "whisper"
+    GEMINI = "gemini"
+
 
 class AudioFile(BaseModel):
     """AudioFile model with processing metadata."""
@@ -35,6 +43,7 @@ class AudioFile(BaseModel):
     processing_status: ProcessingStatus = ProcessingStatus.UPLOADED
     file_path: str
     expires_at: datetime = Field(default_factory=lambda: datetime.now() + timedelta(hours=24))
+    transcription_service: Optional[TranscriptionService] = None
     
     class Config:
         """Pydantic configuration."""

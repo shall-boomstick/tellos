@@ -18,37 +18,45 @@ const useRealtimeWebSocket = ({
 
   // Connect to WebSocket
   const connect = useCallback(async (fileId) => {
-    try {
-      // Close existing connection
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-
-      // Clear any existing reconnect timeout
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-
-      setConnectionStatus('connecting');
-      
-      // Create WebSocket connection
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/realtime/${fileId}`;
-      
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      // Connection opened
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        setIsConnected(true);
-        setConnectionStatus('connected');
-        reconnectAttempts.current = 0;
-        
-        if (onConnect) {
-          onConnect();
+    return new Promise((resolve, reject) => {
+      try {
+        // Close existing connection
+        if (wsRef.current) {
+          wsRef.current.close();
         }
-      };
+
+        // Clear any existing reconnect timeout
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+
+        setConnectionStatus('connecting');
+        
+        // Create WebSocket connection
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Use Vite proxy for WebSocket connections
+        const wsUrl = `${protocol}//${window.location.host}/ws/realtime/${fileId}`;
+        
+        console.log('Creating WebSocket connection to:', wsUrl);
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        // Connection opened
+        ws.onopen = () => {
+          console.log('WebSocket connected successfully');
+          setIsConnected(true);
+          setConnectionStatus('connected');
+          reconnectAttempts.current = 0;
+          
+          // Generate a session ID and resolve the promise
+          const sessionId = `session_${fileId}_${Date.now()}`;
+          console.log('WebSocket session ID:', sessionId);
+          resolve(sessionId);
+          
+          if (onConnect) {
+            onConnect();
+          }
+        };
 
       // Connection closed
       ws.onclose = (event) => {
@@ -76,6 +84,7 @@ const useRealtimeWebSocket = ({
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         setConnectionStatus('error');
+        reject(new Error('WebSocket connection failed'));
         
         if (onError) {
           onError(error);
@@ -85,6 +94,7 @@ const useRealtimeWebSocket = ({
       // Message received
       ws.onmessage = (event) => {
         try {
+          console.log('WebSocket message received:', event.data);
           const data = JSON.parse(event.data);
           handleMessage(data);
         } catch (error) {
@@ -93,13 +103,15 @@ const useRealtimeWebSocket = ({
       };
 
     } catch (error) {
-      console.error('Error connecting to WebSocket:', error);
+      console.error('Error creating WebSocket connection:', error);
       setConnectionStatus('error');
+      reject(error);
       
       if (onError) {
         onError(error);
       }
     }
+    });
   }, [onConnect, onDisconnect, onError]);
 
   // Disconnect from WebSocket
@@ -146,6 +158,12 @@ const useRealtimeWebSocket = ({
         case 'emotion':
           if (onEmotion) {
             onEmotion(data.data);
+          }
+          break;
+          
+        case 'emotion_update':
+          if (onEmotion) {
+            onEmotion(data);
           }
           break;
           

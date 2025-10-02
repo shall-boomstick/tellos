@@ -609,6 +609,38 @@ class FileManager:
         # Start cleanup task
         asyncio.create_task(cleanup_loop())
         logger.info(f"Scheduled cleanup task every {interval_hours} hours")
+    
+    def get_all_file_metadata(self) -> Dict:
+        """Get all file metadata."""
+        return self.file_metadata.copy()
+    
+    def update_file_metadata(self, file_id: str, updates: Dict):
+        """Update file metadata with new information."""
+        if file_id in self.file_metadata:
+            self.file_metadata[file_id].update(updates)
+            self._save_metadata()
+            logger.info(f"Updated metadata for file {file_id}: {updates}")
+    
+    def remove_file_metadata(self, file_id: str):
+        """Remove file metadata."""
+        if file_id in self.file_metadata:
+            del self.file_metadata[file_id]
+            self._save_metadata()
+    
+    async def clear_cached_data(self, file_id: str):
+        """Clear all cached data for a file."""
+        cache_patterns = [
+            f"{file_id}_transcript.json",
+            f"{file_id}_emotions.json",
+            f"{file_id}_features.json",
+            f"{file_id}_audio.wav"
+        ]
+        
+        for pattern in cache_patterns:
+            cache_path = self.cache_dir / pattern
+            if cache_path.exists():
+                cache_path.unlink()
+                logger.info(f"Removed cache file: {cache_path}")
 
 # Global file manager instance
 file_manager = FileManager()

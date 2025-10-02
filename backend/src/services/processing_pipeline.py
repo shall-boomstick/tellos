@@ -151,6 +151,8 @@ class ProcessingPipeline:
             transcription_service_type = os.getenv("TRANSCRIPTION_SERVICE", "whisper").lower()
             logger.info(f"Starting transcription for file {audio_file.id} using {transcription_service_type} service")
             
+            actual_service_used = None
+            
             if transcription_service_type == "gemini":
                 try:
                     gemini_service = get_gemini_service()
@@ -159,6 +161,7 @@ class ProcessingPipeline:
                         audio_file.id, 
                         language="ar"
                     )
+                    actual_service_used = "gemini"
                     logger.info(f"Gemini transcription successful: {len(transcript.text)} characters")
                 except Exception as e:
                     logger.warning(f"Gemini transcription failed, falling back to Whisper: {e}")
@@ -167,6 +170,7 @@ class ProcessingPipeline:
                         audio_file.id, 
                         language="ar"
                     )
+                    actual_service_used = "whisper"
             else:
                 # Use Whisper as default/fallback
                 transcript = await transcription_service.transcribe_audio(
@@ -174,7 +178,17 @@ class ProcessingPipeline:
                     audio_file.id, 
                     language="ar"
                 )
-            logger.info(f"Transcription completed for file {audio_file.id}: {len(transcript.text)} characters")
+                actual_service_used = "whisper"
+            
+            logger.info(f"Transcription completed for file {audio_file.id} using {actual_service_used}: {len(transcript.text)} characters")
+            
+            # Update the audio file with the transcription service used
+            audio_file.transcription_service = actual_service_used
+            
+            # Update file metadata with transcription service
+            file_manager.update_file_metadata(audio_file.id, {
+                "transcription_service": actual_service_used
+            })
             
             # Translate Arabic text to English
             if transcript.text:

@@ -4,6 +4,7 @@ import RealtimeVideoPlayer from '../components/RealtimeVideoPlayer';
 import RealtimeTranslation from '../components/RealtimeTranslation';
 import RealtimeEmotionGauge from '../components/RealtimeEmotionGauge';
 import RealtimeFileUpload from '../components/RealtimeFileUpload';
+import FileManager from '../components/FileManager';
 import ProcessingStatus from '../components/ProcessingStatus';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useRealtimeWebSocket } from '../services/realtimeWebSocket';
@@ -268,32 +269,39 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
   }, [fileId]);
 
   // Handle file upload - use the app's upload handler
-  const handleFileUpload = useCallback(async (file) => {
+  const handleFileUpload = useCallback(async (fileOrData) => {
     if (onFileSelect) {
-      await onFileSelect(file);
+      await onFileSelect(fileOrData);
     } else {
       // Fallback to local upload logic
       try {
         setError(null);
         setIsProcessing(true);
         
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!response.ok) {
-          throw new Error('File upload failed');
+        // Check if it's a File object or file data
+        if (fileOrData instanceof File) {
+          const formData = new FormData();
+          formData.append('file', fileOrData);
+          
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('File upload failed');
+          }
+          
+          const result = await response.json();
+          const newFileId = result.file_id;
+          setFileId(newFileId);
+          
+          await connect(newFileId);
+        } else {
+          // It's file data, just set the file ID
+          setFileId(fileOrData.file_id);
+          await connect(fileOrData.file_id);
         }
-        
-        const result = await response.json();
-        const newFileId = result.file_id;
-        setFileId(newFileId);
-        
-        await connect(newFileId);
         
       } catch (err) {
         setError(`Upload failed: ${err.message}`);
@@ -310,9 +318,26 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
 
   // Handle emotion updates
   function handleEmotionUpdate(data) {
-    setEmotionData(data);
-    syncEmotion(data);
+    console.log('RealtimeInterface: Received emotion update:', data);
+    if (data.emotion) {
+      setEmotionData(data.emotion);
+      syncEmotion(data.emotion);
+    }
   }
+
+  // Generate mock emotion data for testing
+  useEffect(() => {
+    if (isConnected && !emotionData) {
+      const mockEmotion = {
+        emotion_type: "anger",
+        confidence: 0.75,
+        intensity: 0.6,
+        timestamp: Date.now() / 1000
+      };
+      setEmotionData(mockEmotion);
+      console.log('RealtimeInterface: Using mock emotion data for testing');
+    }
+  }, [isConnected, emotionData]);
 
   // Handle status updates
   function handleStatusUpdate(data) {
@@ -372,7 +397,7 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
   const currentTranscript = getCurrentTranscript();
   const currentEmotion = getCurrentEmotion();
 
-  const [showUpload, setShowUpload] = useState(!fileId); // Show upload by default if no file
+  const [showUpload, setShowUpload] = useState(true); // Always show file manager by default
 
   return (
     <Container fluid className="realtime-interface">
@@ -388,15 +413,23 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
       {/* Collapsible File Upload Section - At Top */}
       <Row className="mb-4">
         <Col>
-          <Card>
+          <Card className="file-manager-card">
             <Card.Header 
-              className="d-flex justify-content-between align-items-center"
-              style={{ cursor: 'pointer' }}
+              className={`d-flex justify-content-between align-items-center file-manager-header ${showUpload ? 'expanded' : 'collapsed'}`}
+              style={{ 
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                backgroundColor: showUpload ? '#f8f9fa' : '#e9ecef',
+                borderBottom: showUpload ? '1px solid #dee2e6' : 'none'
+              }}
               onClick={() => setShowUpload(!showUpload)}
             >
               <h5 className="mb-0">
-                <i className="fas fa-upload me-2"></i>
-                Upload Video
+                <i className="fas fa-folder-open me-2"></i>
+                File Manager - Upload or Select Video
+                <small className="text-muted ms-2">
+                  {showUpload ? '(Click to hide)' : '(Click to expand)'}
+                </small>
               </h5>
               <div className="d-flex align-items-center">
                 {/* Connection Status */}
@@ -415,12 +448,25 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
                     Processing...
                   </div>
                 )}
-                <i className={`fas fa-chevron-${showUpload ? 'up' : 'down'}`}></i>
+                <i 
+                  className={`fas fa-chevron-${showUpload ? 'up' : 'down'} transition-icon`}
+                  style={{ 
+                    transition: 'transform 0.3s ease',
+                    transform: showUpload ? 'rotate(0deg)' : 'rotate(180deg)'
+                  }}
+                ></i>
               </div>
             </Card.Header>
-            {showUpload && (
+            <div 
+              className={`file-manager-content ${showUpload ? 'show' : 'hide'}`}
+              style={{
+                maxHeight: showUpload ? '1000px' : '0px',
+                overflow: 'hidden',
+                transition: 'max-height 0.3s ease-in-out'
+              }}
+            >
               <Card.Body>
-                <RealtimeFileUpload
+                <FileManager
                   onFileSelect={handleFileUpload}
                   isProcessing={isUploading || isProcessing}
                 />
@@ -435,7 +481,7 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
                   </div>
                 )}
               </Card.Body>
-            )}
+            </div>
           </Card>
         </Col>
       </Row>
@@ -485,7 +531,7 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
       <Row className="main-content">
         {/* Live Translation Panel - 66% Width */}
         <Col lg={8} className="mb-4">
-          <Card style={{ height: '600px' }}>
+          <Card style={{ height: '450px' }}>
                 <Card.Header>
                   <h5 className="mb-0">Live Translation</h5>
                 </Card.Header>
@@ -516,14 +562,14 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
 
         {/* Emotion Analysis Panel - 33% Width */}
         <Col lg={4} className="mb-4">
-          <Card style={{ height: '600px' }}>
+          <Card style={{ height: '450px' }}>
                 <Card.Header>
                   <h5 className="mb-0">Emotion Analysis</h5>
                 </Card.Header>
             <Card.Body style={{ 
               height: 'calc(100% - 60px)', 
               overflow: 'auto',
-              padding: '15px'
+              padding: '12px'
             }}>
                   {fileId ? (
                     <RealtimeEmotionGauge
@@ -576,6 +622,52 @@ const RealtimeInterface = ({ fileData, onNewUpload, onFileSelect, isUploading, e
           </Col>
         </Row>
       )}
+
+      {/* Custom Styles for File Manager Collapsible */}
+      <style>{`
+        .file-manager-card {
+          border: 1px solid #dee2e6;
+          border-radius: 0.375rem;
+          box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        .file-manager-header {
+          user-select: none;
+          border-radius: 0.375rem 0.375rem 0 0;
+        }
+        
+        .file-manager-header:hover {
+          background-color: #e9ecef !important;
+        }
+        
+        .file-manager-header.expanded {
+          border-radius: 0.375rem 0.375rem 0 0;
+        }
+        
+        .file-manager-header.collapsed {
+          border-radius: 0.375rem;
+        }
+        
+        .file-manager-content {
+          transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        
+        .file-manager-content.hide {
+          opacity: 0;
+        }
+        
+        .file-manager-content.show {
+          opacity: 1;
+        }
+        
+        .transition-icon {
+          transition: transform 0.3s ease;
+        }
+        
+        .file-manager-card .card-body {
+          padding: 1rem;
+        }
+      `}</style>
     </Container>
   );
 };

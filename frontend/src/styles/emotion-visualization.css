@@ -1,0 +1,342 @@
+/* Emotion Visualization Styles */
+
+/* Emotion Color Palette */
+:root {
+  --emotion-joy: #28a745;
+  --emotion-sadness: #6c757d;
+  --emotion-anger: #dc3545;
+  --emotion-fear: #6f42c1;
+  --emotion-surprise: #fd7e14;
+  --emotion-neutral: #17a2b8;
+  
+  /* Intensity levels */
+  --intensity-low: 0.3;
+  --intensity-medium: 0.6;
+  --intensity-high: 0.9;
+}
+
+/* Emotion Meter Animations */
+.emotion-meter {
+  position: relative;
+}
+
+.emotion-meter .meter-fill {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.emotion-meter .meter-fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Emotion Pulse Animation */
+.emotion-pulse {
+  animation: emotionPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes emotionPulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* High Intensity Glow Effect */
+.emotion-high-intensity {
+  box-shadow: 0 0 20px currentColor;
+  animation: intensityGlow 1s ease-in-out infinite alternate;
+}
+
+@keyframes intensityGlow {
+  0% { 
+    box-shadow: 0 0 10px currentColor;
+  }
+  100% { 
+    box-shadow: 0 0 30px currentColor, 0 0 40px currentColor;
+  }
+}
+
+/* Emotion Indicator Styles */
+.emotion-indicator {
+  position: relative;
+  overflow: hidden;
+}
+
+.emotion-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: indicatorShine 3s infinite;
+}
+
+@keyframes indicatorShine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Emotion Type Specific Styles */
+.emotion-joy {
+  background: linear-gradient(135deg, var(--emotion-joy), #20c997);
+  color: white;
+}
+
+.emotion-sadness {
+  background: linear-gradient(135deg, var(--emotion-sadness), #495057);
+  color: white;
+}
+
+.emotion-anger {
+  background: linear-gradient(135deg, var(--emotion-anger), #e74c3c);
+  color: white;
+  animation: angerFlicker 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes angerFlicker {
+  0% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.emotion-fear {
+  background: linear-gradient(135deg, var(--emotion-fear), #8e44ad);
+  color: white;
+  animation: fearShake 0.3s ease-in-out infinite;
+}
+
+@keyframes fearShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.emotion-surprise {
+  background: linear-gradient(135deg, var(--emotion-surprise), #f39c12);
+  color: white;
+  animation: surpriseBounce 0.6s ease-in-out infinite;
+}
+
+@keyframes surpriseBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.emotion-neutral {
+  background: linear-gradient(135deg, var(--emotion-neutral), #3498db);
+  color: white;
+}
+
+/* Intensity Bar Styles */
+.intensity-bar {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.intensity-fill {
+  position: relative;
+  transition: width 0.5s ease;
+}
+
+.intensity-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: intensityFlow 2s infinite;
+}
+
+@keyframes intensityFlow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* High Intensity Bar */
+.intensity-high .intensity-fill {
+  animation: intensityPulse 1s ease-in-out infinite;
+}
+
+@keyframes intensityPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Emotion Timeline Styles */
+.emotion-timeline {
+  position: relative;
+}
+
+.emotion-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--emotion-neutral),
+    var(--emotion-joy),
+    var(--emotion-anger),
+    var(--emotion-sadness)
+  );
+}
+
+.emotion-item {
+  position: relative;
+  margin-left: 1rem;
+  transition: all 0.3s ease;
+}
+
+.emotion-item::before {
+  content: '';
+  position: absolute;
+  left: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+/* Current Emotion Highlight */
+.emotion-current {
+  background: rgba(255, 193, 7, 0.2) !important;
+  border: 2px solid #ffc107 !important;
+  animation: currentEmotionGlow 1s ease-in-out infinite alternate;
+}
+
+@keyframes currentEmotionGlow {
+  0% { 
+    box-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+  }
+  100% { 
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.8);
+  }
+}
+
+/* Emotion Icon Animations */
+.emotion-icon {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.emotion-icon:hover {
+  transform: scale(1.2);
+}
+
+.emotion-icon.animated {
+  animation: iconBounce 0.6s ease-in-out;
+}
+
+@keyframes iconBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .emotion-indicator {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+  
+  .emotion-icon {
+    font-size: 0.8rem;
+  }
+  
+  .intensity-bar {
+    height: 3px;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .emotion-indicator {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+  }
+  
+  .intensity-bar {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Accessibility */
+.emotion-visualization:focus {
+  outline: 2px solid var(--emotion-neutral);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .emotion-meter .meter-fill,
+  .emotion-indicator,
+  .intensity-fill,
+  .emotion-icon {
+    animation: none;
+    transition: none;
+  }
+  
+  .emotion-pulse,
+  .emotion-high-intensity,
+  .angerFlicker,
+  .fearShake,
+  .surpriseBounce {
+    animation: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .emotion-meter,
+  .emotion-indicator,
+  .intensity-bar {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  
+  .emotion-indicator::before,
+  .intensity-fill::after {
+    display: none;
+  }
+}

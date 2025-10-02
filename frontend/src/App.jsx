@@ -3,6 +3,7 @@ import './styles/light.css'
 import './styles/dark.css'
 import './styles/mobile.css'
 import FileUpload from './components/FileUpload'
+import FileManager from './components/FileManager'
 import RealtimeInterface from './pages/RealtimeInterface'
 import ThemeToggle from './components/ThemeToggle'
 import themeService, { subscribeToTheme } from './services/theme'
@@ -23,29 +24,37 @@ function App() {
     return unsubscribe
   }, [])
 
-  const handleFileSelect = async (file) => {
-    setIsUploading(true)
-    setError(null)
-    
-    try {
-      console.log('Uploading file:', file.name)
-      const response = await uploadAPI.uploadFile(file)
+  const handleFileSelect = async (fileOrData) => {
+    // Check if it's a File object (new upload) or file data (existing file)
+    if (fileOrData instanceof File) {
+      // New file upload
+      setIsUploading(true)
+      setError(null)
       
-      const fileData = {
-        file_id: response.data.file_id,
-        filename: file.name,
-        status: response.data.status,
-        uploadedAt: new Date().toISOString()
+      try {
+        console.log('Uploading file:', fileOrData.name)
+        const response = await uploadAPI.uploadFile(fileOrData)
+        
+        const fileData = {
+          file_id: response.data.file_id,
+          filename: fileOrData.name,
+          status: response.data.status,
+          uploadedAt: new Date().toISOString()
+        }
+        
+        setCurrentFile(fileData)
+        console.log('File uploaded successfully:', fileData)
+        
+      } catch (err) {
+        console.error('Upload failed:', err)
+        setError(err.response?.data?.error || 'Upload failed. Please try again.')
+      } finally {
+        setIsUploading(false)
       }
-      
-      setCurrentFile(fileData)
-      console.log('File uploaded successfully:', fileData)
-      
-    } catch (err) {
-      console.error('Upload failed:', err)
-      setError(err.response?.data?.error || 'Upload failed. Please try again.')
-    } finally {
-      setIsUploading(false)
+    } else {
+      // Existing file selected
+      setCurrentFile(fileOrData)
+      setError(null)
     }
   }
 

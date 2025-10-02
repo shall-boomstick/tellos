@@ -300,43 +300,300 @@ class StreamingEmotionService:
     
     async def _analyze_audio_emotion(self, audio_chunk: np.ndarray) -> Dict[str, Any]:
         """
-        Analyze audio chunk for emotion using audio features.
+        Analyze audio chunk for emotion using advanced audio features.
         
         Args:
             audio_chunk: Audio data chunk
             
         Returns:
-            Dict: Emotion analysis results
+            Dict: Emotion analysis results with detailed features
         """
         try:
             # Ensure consistent data type (float32) to avoid dtype mismatch errors
             audio_chunk = audio_chunk.astype(np.float32)
             
-            # Use simple numpy-based features to avoid librosa dtype issues
-            # RMS Energy (loudness)
-            rms = float(np.sqrt(np.mean(audio_chunk**2)))
+            # Advanced audio feature extraction
+            features = self._extract_advanced_audio_features(audio_chunk)
             
-            # Simple zero crossing rate calculation
-            zero_crossings = np.where(np.diff(np.signbit(audio_chunk)))[0]
-            zcr = float(len(zero_crossings) / len(audio_chunk))
+            # Analyze vocal tone characteristics
+            tone_analysis = self._analyze_vocal_tone(features)
             
-            # Simple spectral energy approximation
-            fft = np.fft.fft(audio_chunk)
-            spectral_energy = float(np.mean(np.abs(fft[:len(fft)//2])))
+            # Analyze intensity patterns
+            intensity_analysis = self._analyze_intensity_patterns(features)
             
-            # Simple emotion mapping based on audio features
-            if spectral_energy > 500 and zcr > 0.1:
-                return {"label": "anger", "score": 0.8}
-            elif spectral_energy < 200 and zcr < 0.05:
-                return {"label": "sadness", "score": 0.7}
-            elif rms > 0.1:
-                return {"label": "joy", "score": 0.6}
-            else:
-                return {"label": "neutral", "score": 0.5}
+            # Combine analyses for emotion detection
+            emotion_result = self._combine_emotion_analyses(tone_analysis, intensity_analysis)
+            
+            return emotion_result
                 
         except Exception as e:
             logger.error(f"Error analyzing audio emotion: {e}")
             return {"label": "neutral", "score": 0.5}
+    
+    def _extract_advanced_audio_features(self, audio_chunk: np.ndarray) -> Dict[str, float]:
+        """
+        Extract advanced audio features for emotion analysis.
+        
+        Args:
+            audio_chunk: Audio data chunk
+            
+        Returns:
+            Dict: Extracted audio features
+        """
+        try:
+            # Basic energy features
+            rms = float(np.sqrt(np.mean(audio_chunk**2)))
+            energy = float(np.sum(audio_chunk**2))
+            
+            # Zero crossing rate (speech activity indicator)
+            zero_crossings = np.where(np.diff(np.signbit(audio_chunk)))[0]
+            zcr = float(len(zero_crossings) / len(audio_chunk))
+            
+            # Spectral features
+            fft = np.fft.fft(audio_chunk)
+            magnitude = np.abs(fft[:len(fft)//2])
+            
+            # Spectral centroid (brightness of sound)
+            freqs = np.fft.fftfreq(len(audio_chunk), 1/16000)[:len(magnitude)]
+            spectral_centroid = float(np.sum(freqs * magnitude) / np.sum(magnitude)) if np.sum(magnitude) > 0 else 0
+            
+            # Spectral rolloff (frequency below which 85% of energy lies)
+            cumulative_energy = np.cumsum(magnitude)
+            total_energy = cumulative_energy[-1]
+            rolloff_threshold = 0.85 * total_energy
+            spectral_rolloff_idx = np.where(cumulative_energy >= rolloff_threshold)[0]
+            spectral_rolloff = float(freqs[spectral_rolloff_idx[0]]) if len(spectral_rolloff_idx) > 0 else 0
+            
+            # Spectral bandwidth (spread of spectrum)
+            spectral_bandwidth = float(np.sqrt(np.sum(((freqs - spectral_centroid)**2) * magnitude) / np.sum(magnitude))) if np.sum(magnitude) > 0 else 0
+            
+            # MFCC-like features (simplified)
+            # Mel-frequency cepstral coefficients approximation
+            mel_energies = []
+            for i in range(0, len(magnitude), len(magnitude)//13):  # 13 mel bands
+                band_energy = float(np.mean(magnitude[i:i+len(magnitude)//13]))
+                mel_energies.append(band_energy)
+            
+            # Pitch estimation (simplified autocorrelation)
+            autocorr = np.correlate(audio_chunk, audio_chunk, mode='full')
+            autocorr = autocorr[len(autocorr)//2:]
+            
+            # Find peaks for pitch estimation
+            peaks = []
+            for i in range(1, len(autocorr)-1):
+                if autocorr[i] > autocorr[i-1] and autocorr[i] > autocorr[i+1]:
+                    peaks.append(i)
+            
+            # Estimate fundamental frequency
+            if peaks:
+                # Find the first significant peak (fundamental frequency)
+                fundamental_freq = 16000 / peaks[0] if peaks[0] > 0 else 0
+            else:
+                fundamental_freq = 0
+            
+            # Voice activity detection
+            voice_activity = 1.0 if rms > 0.01 and zcr > 0.01 else 0.0
+            
+            return {
+                'rms': rms,
+                'energy': energy,
+                'zcr': zcr,
+                'spectral_centroid': spectral_centroid,
+                'spectral_rolloff': spectral_rolloff,
+                'spectral_bandwidth': spectral_bandwidth,
+                'mel_energies': mel_energies,
+                'fundamental_freq': fundamental_freq,
+                'voice_activity': voice_activity,
+                'spectral_energy': float(np.sum(magnitude))
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting advanced audio features: {e}")
+            return {
+                'rms': 0.0, 'energy': 0.0, 'zcr': 0.0,
+                'spectral_centroid': 0.0, 'spectral_rolloff': 0.0,
+                'spectral_bandwidth': 0.0, 'mel_energies': [0.0] * 13,
+                'fundamental_freq': 0.0, 'voice_activity': 0.0,
+                'spectral_energy': 0.0
+            }
+    
+    def _analyze_vocal_tone(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Analyze vocal tone characteristics for emotion detection.
+        
+        Args:
+            features: Extracted audio features
+            
+        Returns:
+            Dict: Vocal tone analysis results
+        """
+        try:
+            # Analyze pitch characteristics
+            pitch_analysis = self._analyze_pitch_features(features)
+            
+            # Analyze spectral characteristics
+            spectral_analysis = self._analyze_spectral_features(features)
+            
+            # Analyze energy patterns
+            energy_analysis = self._analyze_energy_features(features)
+            
+            return {
+                'pitch': pitch_analysis,
+                'spectral': spectral_analysis,
+                'energy': energy_analysis
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing vocal tone: {e}")
+            return {'pitch': {}, 'spectral': {}, 'energy': {}}
+    
+    def _analyze_pitch_features(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Analyze pitch-related features."""
+        fundamental_freq = features['fundamental_freq']
+        
+        # Pitch analysis for emotion detection
+        if fundamental_freq > 300:  # High pitch
+            return {'level': 'high', 'emotion_hint': 'anger', 'confidence': 0.7}
+        elif fundamental_freq < 150:  # Low pitch
+            return {'level': 'low', 'emotion_hint': 'sadness', 'confidence': 0.6}
+        else:  # Normal pitch
+            return {'level': 'normal', 'emotion_hint': 'neutral', 'confidence': 0.5}
+    
+    def _analyze_spectral_features(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Analyze spectral characteristics."""
+        spectral_centroid = features['spectral_centroid']
+        spectral_bandwidth = features['spectral_bandwidth']
+        
+        # Spectral analysis for emotion detection
+        if spectral_centroid > 2000:  # Bright sound
+            return {'brightness': 'bright', 'emotion_hint': 'joy', 'confidence': 0.6}
+        elif spectral_centroid < 1000:  # Dark sound
+            return {'brightness': 'dark', 'emotion_hint': 'sadness', 'confidence': 0.6}
+        else:  # Neutral brightness
+            return {'brightness': 'neutral', 'emotion_hint': 'neutral', 'confidence': 0.5}
+    
+    def _analyze_energy_features(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Analyze energy patterns."""
+        rms = features['rms']
+        energy = features['energy']
+        
+        # Energy analysis for emotion detection
+        if rms > 0.1:  # High energy
+            return {'level': 'high', 'emotion_hint': 'anger', 'confidence': 0.8}
+        elif rms < 0.02:  # Low energy
+            return {'level': 'low', 'emotion_hint': 'sadness', 'confidence': 0.7}
+        else:  # Medium energy
+            return {'level': 'medium', 'emotion_hint': 'neutral', 'confidence': 0.5}
+    
+    def _analyze_intensity_patterns(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Analyze intensity patterns for emotion detection.
+        
+        Args:
+            features: Extracted audio features
+            
+        Returns:
+            Dict: Intensity analysis results
+        """
+        try:
+            rms = features['rms']
+            spectral_energy = features['spectral_energy']
+            zcr = features['zcr']
+            
+            # Calculate intensity score
+            intensity_score = (rms * 10) + (spectral_energy / 1000) + (zcr * 2)
+            
+            # Analyze intensity patterns
+            if intensity_score > 1.5:
+                return {
+                    'level': 'high',
+                    'emotion_hint': 'anger',
+                    'confidence': min(0.9, intensity_score / 2),
+                    'score': intensity_score
+                }
+            elif intensity_score < 0.3:
+                return {
+                    'level': 'low',
+                    'emotion_hint': 'sadness',
+                    'confidence': min(0.8, (0.3 - intensity_score) * 2),
+                    'score': intensity_score
+                }
+            else:
+                return {
+                    'level': 'medium',
+                    'emotion_hint': 'neutral',
+                    'confidence': 0.5,
+                    'score': intensity_score
+                }
+                
+        except Exception as e:
+            logger.error(f"Error analyzing intensity patterns: {e}")
+            return {'level': 'medium', 'emotion_hint': 'neutral', 'confidence': 0.5, 'score': 0.5}
+    
+    def _combine_emotion_analyses(self, tone_analysis: Dict, intensity_analysis: Dict) -> Dict[str, Any]:
+        """
+        Combine tone and intensity analyses for final emotion detection.
+        
+        Args:
+            tone_analysis: Vocal tone analysis results
+            intensity_analysis: Intensity analysis results
+            
+        Returns:
+            Dict: Combined emotion analysis results
+        """
+        try:
+            # Collect emotion hints from different analyses
+            emotion_hints = []
+            confidences = []
+            
+            # From tone analysis
+            if tone_analysis.get('pitch', {}).get('emotion_hint'):
+                emotion_hints.append(tone_analysis['pitch']['emotion_hint'])
+                confidences.append(tone_analysis['pitch']['confidence'])
+            
+            if tone_analysis.get('spectral', {}).get('emotion_hint'):
+                emotion_hints.append(tone_analysis['spectral']['emotion_hint'])
+                confidences.append(tone_analysis['spectral']['confidence'])
+            
+            if tone_analysis.get('energy', {}).get('emotion_hint'):
+                emotion_hints.append(tone_analysis['energy']['emotion_hint'])
+                confidences.append(tone_analysis['energy']['confidence'])
+            
+            # From intensity analysis
+            if intensity_analysis.get('emotion_hint'):
+                emotion_hints.append(intensity_analysis['emotion_hint'])
+                confidences.append(intensity_analysis['confidence'])
+            
+            # Determine final emotion (most common or highest confidence)
+            if emotion_hints:
+                # Count emotion occurrences
+                emotion_counts = {}
+                emotion_confidences = {}
+                
+                for emotion, confidence in zip(emotion_hints, confidences):
+                    emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+                    emotion_confidences[emotion] = emotion_confidences.get(emotion, 0) + confidence
+                
+                # Find emotion with highest combined score (count * avg_confidence)
+                best_emotion = max(emotion_counts.keys(), 
+                                 key=lambda e: emotion_counts[e] * (emotion_confidences[e] / emotion_counts[e]))
+                
+                # Calculate final confidence
+                final_confidence = emotion_confidences[best_emotion] / emotion_counts[best_emotion]
+                
+                return {
+                    'label': best_emotion,
+                    'score': final_confidence,
+                    'intensity_score': intensity_analysis.get('score', 0.5),
+                    'tone_analysis': tone_analysis,
+                    'intensity_analysis': intensity_analysis
+                }
+            else:
+                return {'label': 'neutral', 'score': 0.5, 'intensity_score': 0.5}
+                
+        except Exception as e:
+            logger.error(f"Error combining emotion analyses: {e}")
+            return {'label': 'neutral', 'score': 0.5, 'intensity_score': 0.5}
     
     async def _calculate_emotion_intensity(self, audio_chunk: np.ndarray, emotion_type: EmotionType) -> EmotionIntensity:
         """

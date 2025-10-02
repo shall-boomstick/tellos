@@ -107,6 +107,23 @@ export const uploadAPI = {
   getUploadStatus: async (fileId) => {
     return api.get(`/upload/${fileId}/status`)
   },
+
+  /**
+   * List all uploaded files
+   * @returns {Promise} Files list response
+   */
+  listFiles: async () => {
+    return api.get('/upload/files')
+  },
+
+  /**
+   * Delete an uploaded file
+   * @param {string} fileId - File identifier
+   * @returns {Promise} Delete response
+   */
+  deleteFile: async (fileId) => {
+    return api.delete(`/upload/${fileId}`)
+  },
 }
 
 /**

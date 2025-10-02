@@ -3,6 +3,7 @@ import { uploadAPI, processingAPI, pollUploadStatus } from '../services/api'
 import websocketService from '../services/websocket'
 import AudioPlayer from '../components/AudioPlayer'
 import EmotionGauge from '../components/EmotionGauge'
+import EmotionMeter from '../components/EmotionMeter'
 import Transcript from '../components/Transcript'
 
 const Dashboard = ({ fileData }) => {
@@ -11,6 +12,8 @@ const Dashboard = ({ fileData }) => {
   const [error, setError] = useState(null)
   const [transcript, setTranscript] = useState(null)
   const [emotions, setEmotions] = useState(null)
+  const [emotionData, setEmotionData] = useState([])
+  const [currentEmotion, setCurrentEmotion] = useState(null)
   const [audioUrl, setAudioUrl] = useState(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -24,6 +27,35 @@ const Dashboard = ({ fileData }) => {
     
     const setupConnections = async () => {
       try {
+        // Try to connect to realtime WebSocket for emotion analysis
+        try {
+          await websocketService.connect(`realtime-${fileData.file_id}`, {
+            url: `ws://localhost:8000/ws/realtime/${fileData.file_id}`,
+            onMessage: (message) => {
+              console.log('Realtime WebSocket message:', message);
+              if (message.type === 'emotion_update' && message.emotion) {
+                setEmotionData(prev => [...prev, message.emotion]);
+                
+                // Update current emotion if it matches current time
+                if (message.emotion.start_time <= currentTime && message.emotion.end_time >= currentTime) {
+                  setCurrentEmotion(message.emotion);
+                }
+              } else if (message.type === 'test') {
+                console.log('Realtime WebSocket test message received:', message.message);
+              }
+            },
+            onError: (error) => {
+              console.error('Realtime WebSocket error:', error);
+            },
+            onClose: () => {
+              console.log('Realtime WebSocket disconnected');
+            }
+          });
+          console.log('Realtime WebSocket connected');
+        } catch (wsError) {
+          console.log('Realtime WebSocket connection failed, using polling only:', wsError);
+        }
+
         // WebSocket connections disabled - using polling only
         console.log('Using polling-only mode (WebSockets disabled)')
 
@@ -68,6 +100,9 @@ const Dashboard = ({ fileData }) => {
       if (stopPolling) {
         stopPolling()
       }
+      
+      // Disconnect realtime WebSocket
+      websocketService.disconnect(`realtime-${fileData.file_id}`)
       
       // Reset polling state
       setPollingActive(false)
@@ -137,6 +172,37 @@ const Dashboard = ({ fileData }) => {
     
     checkInitialStatus()
   }, [fileData.file_id])
+
+  // Update current emotion based on playback time
+  useEffect(() => {
+    if (emotionData.length > 0 && currentTime > 0) {
+      const matchingEmotion = emotionData.find(emotion => 
+        emotion.start_time <= currentTime && emotion.end_time >= currentTime
+      );
+      
+      if (matchingEmotion) {
+        setCurrentEmotion(matchingEmotion);
+      }
+    } else if (currentTime > 0 && emotionData.length === 0) {
+      // Generate mock emotion data for testing
+      const mockEmotions = [
+        { emotion_type: 'neutral', confidence: 0.6, intensity: 'medium', start_time: 0, end_time: 5 },
+        { emotion_type: 'joy', confidence: 0.8, intensity: 'high', start_time: 5, end_time: 10 },
+        { emotion_type: 'anger', confidence: 0.7, intensity: 'high', start_time: 10, end_time: 15 },
+        { emotion_type: 'sadness', confidence: 0.5, intensity: 'low', start_time: 15, end_time: 20 },
+        { emotion_type: 'surprise', confidence: 0.9, intensity: 'high', start_time: 20, end_time: 25 }
+      ];
+      
+      const currentMockEmotion = mockEmotions.find(emotion => 
+        emotion.start_time <= currentTime && emotion.end_time >= currentTime
+      );
+      
+      if (currentMockEmotion) {
+        setCurrentEmotion(currentMockEmotion);
+        setEmotionData(mockEmotions);
+      }
+    }
+  }, [currentTime, emotionData])
 
   const getStatusMessage = () => {
     switch (status) {
@@ -224,6 +290,20 @@ const Dashboard = ({ fileData }) => {
                 />
               </div>
             )}
+
+            {/* Real-time Emotion Analysis */}
+            <div className="realtime-emotion-section">
+              <EmotionMeter
+                emotionData={emotionData}
+                currentTime={currentTime}
+                playbackState={{
+                  currentTime: currentTime,
+                  duration: emotions?.segments?.[emotions.segments.length - 1]?.end_time || 30,
+                  isPlaying: isPlaying
+                }}
+                isConnected={wsConnected}
+              />
+            </div>
 
                 {transcript && (
                   <div className="transcript-section">

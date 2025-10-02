@@ -68,6 +68,7 @@ class ConnectionManager:
 # Connection managers
 processing_manager = ConnectionManager()
 playback_manager_ws = ConnectionManager()
+emotion_manager = ConnectionManager()
 
 @router.websocket("/ws/processing/{file_id}")
 async def websocket_processing_endpoint(
@@ -252,6 +253,92 @@ async def websocket_playback_endpoint(
     finally:
         playback_manager_ws.disconnect(websocket, file_id)
         playback_manager.remove_session(session.session_id)
+
+@router.websocket("/ws/emotion/{file_id}")
+async def websocket_emotion_endpoint(
+    websocket: WebSocket,
+    file_id: str = Path(..., description="File identifier")
+):
+    """
+    WebSocket endpoint for real-time emotion analysis streaming.
+    """
+    # Check if file exists
+    if file_id not in uploaded_files:
+        file_path = file_manager.get_file_path(file_id)
+        if not file_path or not os.path.exists(file_path):
+            await websocket.close(code=4004, reason="File not found")
+            return
+    
+    await emotion_manager.connect(websocket, file_id)
+    
+    # Send initial connection message
+    await emotion_manager.send_personal_message({
+        "type": "connected",
+        "file_id": file_id,
+        "timestamp": datetime.now().isoformat()
+    }, websocket)
+    
+    try:
+        # Start emotion analysis streaming
+        from ..services.streaming_emotion_service import streaming_emotion_service
+        session_id = f"emotion_{file_id}_{datetime.now().timestamp()}"
+        
+        # Get audio path
+        audio_file = uploaded_files.get(file_id)
+        audio_path = audio_file.file_path if audio_file else file_manager.get_file_path(file_id)
+        
+        # Start streaming emotion analysis
+        async for emotion_update in streaming_emotion_service.start_streaming(
+            file_id, session_id, audio_path
+        ):
+            # Send emotion update to client
+            await emotion_manager.send_personal_message({
+                "type": "emotion_update",
+                "file_id": file_id,
+                "session_id": session_id,
+                "emotion": emotion_update.emotion.dict(),
+                "timestamp": datetime.now().isoformat()
+            }, websocket)
+            
+            # Check if client is still connected
+            try:
+                # Non-blocking check for client messages
+                await asyncio.wait_for(websocket.receive_text(), timeout=0.001)
+            except asyncio.TimeoutError:
+                # No message from client, continue streaming
+                pass
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                # Client disconnected or error
+                break
+        
+        # Send completion message
+        await emotion_manager.send_personal_message({
+            "type": "emotion_complete",
+            "file_id": file_id,
+            "session_id": session_id,
+            "message": "Emotion analysis completed",
+            "timestamp": datetime.now().isoformat()
+        }, websocket)
+        
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error(f"Error in emotion streaming: {e}")
+        await emotion_manager.send_personal_message({
+            "type": "error",
+            "file_id": file_id,
+            "message": f"Emotion analysis error: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }, websocket)
+    finally:
+        emotion_manager.disconnect(websocket, file_id)
+        # Stop emotion streaming
+        try:
+            await streaming_emotion_service.stop_streaming(session_id)
+        except Exception:
+            pass
 
 async def send_real_time_processing_updates(websocket: WebSocket, file_id: str):
     """Send real-time processing updates from pipeline."""
